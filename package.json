@@ -1,0 +1,22 @@
+{
+  "name": "wcjs-angular",
+  "version": "0.0.1",
+  "description": "Angular WebChimera",
+  "main": "build/scripts/main.js",
+  "devDependencies": {
+    "coffee-script": "~1.10.0",
+    "grunt": "^0.4.5",
+    "grunt-angular-templates": "^0.5.7",
+    "grunt-contrib-clean": "~0.6.0",
+    "grunt-contrib-coffee": "~0.13.0",
+    "grunt-contrib-concat": "^0.5.1",
+    "grunt-contrib-stylus": "^0.22.0",
+    "grunt-contrib-watch": "^0.6.1",
+    "grunt-ng-annotate": "^1.0.1",
+    "load-grunt-tasks": "^3.2.0"
+  },
+  "dependencies": {},
+  "scripts": {
+    "start": "grunt dev"
+  }
+}
