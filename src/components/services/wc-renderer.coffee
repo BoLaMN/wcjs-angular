@@ -40,211 +40,222 @@ angular.module 'wcjs-angular'
       
       return
 
-.factory 'wcjsRenderer', (Texture, os) ->
-  wcAddon = require 'wcjs-prebuilt'
+.provider 'wcjsRenderer', ->
+  wcAddonPath = null
     
-  render = (canvas, videoFrame, vlc) ->
-    if !vlc.playing
-      return
-    
-    gl = canvas.gl
-    len = videoFrame.length
-    
-    videoFrame.y.fill videoFrame.subarray(0, videoFrame.uOffset)
-    videoFrame.u.fill videoFrame.subarray(videoFrame.uOffset, videoFrame.vOffset)
-    videoFrame.v.fill videoFrame.subarray(videoFrame.vOffset, len)
-    
-    gl.drawArrays gl.TRIANGLE_STRIP, 0, 4
-    
-    return
+  setAddonPath: (path) ->
+    wcAddonPath = path 
 
-  renderFallback = (canvas, videoFrame) ->
-    buf = canvas.img.data
-    
-    width = videoFrame.width
-    height = videoFrame.height
-    
-    i = 0
-    
-    while i < height
-      j = 0
-      while j < width
-        o = (j + width * i) * 4
-        buf[o + 0] = videoFrame[o + 2]
-        buf[o + 1] = videoFrame[o + 1]
-        buf[o + 2] = videoFrame[o + 0]
-        buf[o + 3] = videoFrame[o + 3]
-        ++j
-      ++i
-    
-    canvas.ctx.putImageData canvas.img, 0, 0
+  $get: ($log, Texture) ->
 
-    return
-
-  setupCanvas = (canvas, vlc, fallbackRenderer) ->
-    if !fallbackRenderer
-      canvas.gl = canvas.getContext('webgl')
-
-    gl = canvas.gl
-    
-    if !gl or fallbackRenderer
-      console.log if fallbackRenderer then 'Fallback renderer forced, not using WebGL' else 'Unable to initialize WebGL, falling back to canvas rendering'
-      vlc.pixelFormat = vlc.RV32
-      canvas.ctx = canvas.getContext('2d')
-      delete canvas.gl
-      # in case of fallback renderer
-      return
-    
-    vlc.pixelFormat = vlc.I420
-    canvas.I420Program = gl.createProgram()
-    program = canvas.I420Program
-    
-    vertexShaderSource = [
-      'attribute highp vec4 aVertexPosition;'
-      'attribute vec2 aTextureCoord;'
-      'varying highp vec2 vTextureCoord;'
-      'void main(void) {'
-      ' gl_Position = aVertexPosition;'
-      ' vTextureCoord = aTextureCoord;'
-      '}'
-    ].join('\n')
-    
-    vertexShader = gl.createShader(gl.VERTEX_SHADER)
-    
-    gl.shaderSource vertexShader, vertexShaderSource
-    gl.compileShader vertexShader
-    
-    fragmentShaderSource = [
-      'precision highp float;'
-      'varying lowp vec2 vTextureCoord;'
-      'uniform sampler2D YTexture;'
-      'uniform sampler2D UTexture;'
-      'uniform sampler2D VTexture;'
-      'const mat4 YUV2RGB = mat4'
-      '('
-      ' 1.1643828125, 0, 1.59602734375, -.87078515625,'
-      ' 1.1643828125, -.39176171875, -.81296875, .52959375,'
-      ' 1.1643828125, 2.017234375, 0, -1.081390625,'
-      ' 0, 0, 0, 1'
-      ');'
-      'void main(void) {'
-      ' gl_FragColor = vec4( texture2D(YTexture, vTextureCoord).x, texture2D(UTexture, vTextureCoord).x, texture2D(VTexture, vTextureCoord).x, 1) * YUV2RGB;'
-      '}'
-    ].join('\n')
-
-    fragmentShader = gl.createShader(gl.FRAGMENT_SHADER)
-    
-    gl.shaderSource fragmentShader, fragmentShaderSource
-    gl.compileShader fragmentShader
-    
-    gl.attachShader program, vertexShader
-    gl.attachShader program, fragmentShader
-    
-    gl.linkProgram program
-    gl.useProgram program
-    
-    if !gl.getProgramParameter(program, gl.LINK_STATUS)
-      console.log 'Shader link failed.'
-    
-    vertexPositionAttribute = gl.getAttribLocation(program, 'aVertexPosition')
-    
-    gl.enableVertexAttribArray vertexPositionAttribute
-    
-    textureCoordAttribute = gl.getAttribLocation(program, 'aTextureCoord')
-    
-    gl.enableVertexAttribArray textureCoordAttribute
-    
-    verticesBuffer = gl.createBuffer()
-    
-    gl.bindBuffer gl.ARRAY_BUFFER, verticesBuffer
-    gl.bufferData gl.ARRAY_BUFFER, new Float32Array([1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, -1.0, 0.0, -1.0, -1.0, 0.0, ]), gl.STATIC_DRAW
-    gl.vertexAttribPointer vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0
-    
-    texCoordBuffer = gl.createBuffer()
-    
-    gl.bindBuffer gl.ARRAY_BUFFER, texCoordBuffer
-    gl.bufferData gl.ARRAY_BUFFER, new Float32Array([1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0 ]), gl.STATIC_DRAW
-    gl.vertexAttribPointer textureCoordAttribute, 2, gl.FLOAT, false, 0, 0
-
-    return
-
-  frameSetup = (canvas, width, height, pixelFormat, videoFrame) ->
-    gl = canvas.gl
-    
-    canvas.width = width
-    canvas.height = height
-    
-    if !gl
-      canvas.img = canvas.ctx.createImageData(width, height)
-      return
-    
-    program = canvas.I420Program
-
-    gl.viewport 0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight
-
-    videoFrame.y = new Texture(gl, width, height)
-    videoFrame.u = new Texture(gl, width >> 1, height >> 1)
-    videoFrame.v = new Texture(gl, width >> 1, height >> 1)
-
-    videoFrame.y.bind 0, program, 'YTexture'
-    videoFrame.u.bind 1, program, 'UTexture'
-    videoFrame.v.bind 2, program, 'VTexture'
-
-    return
-
-  init: (canvas, params = {}, fallbackRenderer) ->
-    @_canvas = canvas
-    
-    vlc = wcAddon.createPlayer(params)
-
-    setupCanvas canvas, vlc, fallbackRenderer
-
-    vlc.onFrameSetup = (width, height, pixelFormat, videoFrame) ->
-      frameSetup canvas, width, height, pixelFormat, videoFrame
-      
-      canvas.addEventListener 'webglcontextlost', ((event) ->
-        event.preventDefault()
+    render = (canvas, videoFrame, vlc) ->
+      if !vlc.playing
         return
-      ), false
-
-      canvas.addEventListener 'webglcontextrestored', ((w, h, p, v) ->
-        (event) ->
-          setupCanvas canvas, vlc
-          frameSetup canvas, w, h, p, v
-          return
-      )(width, height, pixelFormat, videoFrame), false
-
-      return
-
-    setFrame = this
-
-    vlc.onFrameReady = (videoFrame) ->
-      (if canvas.gl then render else renderFallback) canvas, videoFrame, vlc
-      setFrame._lastFrame = videoFrame
-      return
-
-    vlc
-
-  clearCanvas: ->
-    if @_lastFrame
-      gl = @_canvas.gl
       
-      arr1 = new Uint8Array(@_lastFrame.uOffset)
-      arr2 = new Uint8Array(@_lastFrame.vOffset - (@_lastFrame.uOffset))
+      gl = canvas.gl
+      len = videoFrame.length
+      
+      videoFrame.y.fill videoFrame.subarray(0, videoFrame.uOffset)
+      videoFrame.u.fill videoFrame.subarray(videoFrame.uOffset, videoFrame.vOffset)
+      videoFrame.v.fill videoFrame.subarray(videoFrame.vOffset, len)
+      
+      gl.drawArrays gl.TRIANGLE_STRIP, 0, 4
+      
+      return
+
+    renderFallback = (canvas, videoFrame) ->
+      buf = canvas.img.data
+      
+      width = videoFrame.width
+      height = videoFrame.height
       
       i = 0
       
-      while i < arr2.length
-        arr2[i] = 128
+      while i < height
+        j = 0
+        while j < width
+          o = (j + width * i) * 4
+          buf[o + 0] = videoFrame[o + 2]
+          buf[o + 1] = videoFrame[o + 1]
+          buf[o + 2] = videoFrame[o + 0]
+          buf[o + 3] = videoFrame[o + 3]
+          ++j
         ++i
       
-      @_lastFrame.y.fill arr1
-      @_lastFrame.u.fill arr2
-      @_lastFrame.v.fill arr2
-      
-      gl.drawArrays gl.TRIANGLE_STRIP, 0, 4
-    
-    return
+      canvas.ctx.putImageData canvas.img, 0, 0
 
-  _lastFrame: false
-  _canvas: false
+      return
+
+    setupCanvas = (canvas, vlc, fallbackRenderer) ->
+      if !fallbackRenderer
+        canvas.gl = canvas.getContext('webgl')
+
+      gl = canvas.gl
+      
+      if !gl or fallbackRenderer
+        console.log if fallbackRenderer then 'Fallback renderer forced, not using WebGL' else 'Unable to initialize WebGL, falling back to canvas rendering'
+        vlc.pixelFormat = vlc.RV32
+        canvas.ctx = canvas.getContext('2d')
+        delete canvas.gl
+        # in case of fallback renderer
+        return
+      
+      vlc.pixelFormat = vlc.I420
+      canvas.I420Program = gl.createProgram()
+      program = canvas.I420Program
+      
+      vertexShaderSource = [
+        'attribute highp vec4 aVertexPosition;'
+        'attribute vec2 aTextureCoord;'
+        'varying highp vec2 vTextureCoord;'
+        'void main(void) {'
+        ' gl_Position = aVertexPosition;'
+        ' vTextureCoord = aTextureCoord;'
+        '}'
+      ].join('\n')
+      
+      vertexShader = gl.createShader(gl.VERTEX_SHADER)
+      
+      gl.shaderSource vertexShader, vertexShaderSource
+      gl.compileShader vertexShader
+      
+      fragmentShaderSource = [
+        'precision highp float;'
+        'varying lowp vec2 vTextureCoord;'
+        'uniform sampler2D YTexture;'
+        'uniform sampler2D UTexture;'
+        'uniform sampler2D VTexture;'
+        'const mat4 YUV2RGB = mat4'
+        '('
+        ' 1.1643828125, 0, 1.59602734375, -.87078515625,'
+        ' 1.1643828125, -.39176171875, -.81296875, .52959375,'
+        ' 1.1643828125, 2.017234375, 0, -1.081390625,'
+        ' 0, 0, 0, 1'
+        ');'
+        'void main(void) {'
+        ' gl_FragColor = vec4( texture2D(YTexture, vTextureCoord).x, texture2D(UTexture, vTextureCoord).x, texture2D(VTexture, vTextureCoord).x, 1) * YUV2RGB;'
+        '}'
+      ].join('\n')
+
+      fragmentShader = gl.createShader(gl.FRAGMENT_SHADER)
+      
+      gl.shaderSource fragmentShader, fragmentShaderSource
+      gl.compileShader fragmentShader
+      
+      gl.attachShader program, vertexShader
+      gl.attachShader program, fragmentShader
+      
+      gl.linkProgram program
+      gl.useProgram program
+      
+      if !gl.getProgramParameter(program, gl.LINK_STATUS)
+        console.log 'Shader link failed.'
+      
+      vertexPositionAttribute = gl.getAttribLocation(program, 'aVertexPosition')
+      
+      gl.enableVertexAttribArray vertexPositionAttribute
+      
+      textureCoordAttribute = gl.getAttribLocation(program, 'aTextureCoord')
+      
+      gl.enableVertexAttribArray textureCoordAttribute
+      
+      verticesBuffer = gl.createBuffer()
+      
+      gl.bindBuffer gl.ARRAY_BUFFER, verticesBuffer
+      gl.bufferData gl.ARRAY_BUFFER, new Float32Array([1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, -1.0, 0.0, -1.0, -1.0, 0.0, ]), gl.STATIC_DRAW
+      gl.vertexAttribPointer vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0
+      
+      texCoordBuffer = gl.createBuffer()
+      
+      gl.bindBuffer gl.ARRAY_BUFFER, texCoordBuffer
+      gl.bufferData gl.ARRAY_BUFFER, new Float32Array([1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0 ]), gl.STATIC_DRAW
+      gl.vertexAttribPointer textureCoordAttribute, 2, gl.FLOAT, false, 0, 0
+
+      return
+
+    frameSetup = (canvas, width, height, pixelFormat, videoFrame) ->
+      gl = canvas.gl
+      
+      canvas.width = width
+      canvas.height = height
+      
+      if !gl
+        canvas.img = canvas.ctx.createImageData(width, height)
+        return
+      
+      program = canvas.I420Program
+
+      gl.viewport 0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight
+
+      videoFrame.y = new Texture(gl, width, height)
+      videoFrame.u = new Texture(gl, width >> 1, height >> 1)
+      videoFrame.v = new Texture(gl, width >> 1, height >> 1)
+
+      videoFrame.y.bind 0, program, 'YTexture'
+      videoFrame.u.bind 1, program, 'UTexture'
+      videoFrame.v.bind 2, program, 'VTexture'
+
+      return
+
+    init: (canvas, params = {}, fallbackRenderer) ->
+      @_canvas = canvas
+
+      if not wcAddonPath 
+        $log.error 'wcAddonPath not found, use wcjsRenderer.setAddonPath \'path\' to set'
+        return
+
+      wcAddon = require wcAddonPath + '/WebChimera.js.node'
+
+      vlc = wcAddon.createPlayer(params)
+
+      setupCanvas canvas, vlc, fallbackRenderer
+
+      vlc.onFrameSetup = (width, height, pixelFormat, videoFrame) ->
+        frameSetup canvas, width, height, pixelFormat, videoFrame
+        
+        canvas.addEventListener 'webglcontextlost', ((event) ->
+          event.preventDefault()
+          return
+        ), false
+
+        canvas.addEventListener 'webglcontextrestored', ((w, h, p, v) ->
+          (event) ->
+            setupCanvas canvas, vlc
+            frameSetup canvas, w, h, p, v
+            return
+        )(width, height, pixelFormat, videoFrame), false
+
+        return
+
+      setFrame = this
+
+      vlc.onFrameReady = (videoFrame) ->
+        (if canvas.gl then render else renderFallback) canvas, videoFrame, vlc
+        setFrame._lastFrame = videoFrame
+        return
+
+      vlc
+
+    clearCanvas: ->
+      if @_lastFrame
+        gl = @_canvas.gl
+        
+        arr1 = new Uint8Array(@_lastFrame.uOffset)
+        arr2 = new Uint8Array(@_lastFrame.vOffset - (@_lastFrame.uOffset))
+        
+        i = 0
+        
+        while i < arr2.length
+          arr2[i] = 128
+          ++i
+        
+        @_lastFrame.y.fill arr1
+        @_lastFrame.u.fill arr2
+        @_lastFrame.v.fill arr2
+        
+        gl.drawArrays gl.TRIANGLE_STRIP, 0, 4
+      
+      return
+
+    _lastFrame: false
+    _canvas: false

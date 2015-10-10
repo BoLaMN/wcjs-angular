@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.poster', []
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcPoster', ->
   restrict: 'E'

@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.buffering', []
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcBuffering', (WC_STATES, WC_UTILS) ->
   restrict: 'E'

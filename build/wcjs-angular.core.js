@@ -1,18 +1,5 @@
 'use strict';
-angular.module('wcjs-angular', ['wcjs-angular.plugins']).directive('ptDetail', function() {
-  return {
-    restrict: 'E',
-    templateUrl: 'webchimera/webchimera.html',
-    controller: 'detailCtrl as chimera'
-  };
-}).controller('detailCtrl', function($scope, playerConfig) {
-  var vm;
-  vm = this;
-  vm.config = playerConfig.config;
-  $scope.$watch('chimera.torrent.ready', function(readyState) {
-    return vm.config.controls = readyState;
-  });
-});
+angular.module('wcjs-angular', ['wcjs-angular.plugins']);
 
 'use strict';
 
@@ -700,150 +687,163 @@ angular.module('wcjs-angular').factory('Texture', function() {
     return Texture;
 
   })();
-}).factory('wcjsRenderer', function(Texture, os) {
-  var frameSetup, render, renderFallback, setupCanvas, wcAddon;
-  wcAddon = require('wcjs-prebuilt');
-  render = function(canvas, videoFrame, vlc) {
-    var gl, len;
-    if (!vlc.playing) {
-      return;
-    }
-    gl = canvas.gl;
-    len = videoFrame.length;
-    videoFrame.y.fill(videoFrame.subarray(0, videoFrame.uOffset));
-    videoFrame.u.fill(videoFrame.subarray(videoFrame.uOffset, videoFrame.vOffset));
-    videoFrame.v.fill(videoFrame.subarray(videoFrame.vOffset, len));
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  };
-  renderFallback = function(canvas, videoFrame) {
-    var buf, height, i, j, o, width;
-    buf = canvas.img.data;
-    width = videoFrame.width;
-    height = videoFrame.height;
-    i = 0;
-    while (i < height) {
-      j = 0;
-      while (j < width) {
-        o = (j + width * i) * 4;
-        buf[o + 0] = videoFrame[o + 2];
-        buf[o + 1] = videoFrame[o + 1];
-        buf[o + 2] = videoFrame[o + 0];
-        buf[o + 3] = videoFrame[o + 3];
-        ++j;
-      }
-      ++i;
-    }
-    canvas.ctx.putImageData(canvas.img, 0, 0);
-  };
-  setupCanvas = function(canvas, vlc, fallbackRenderer) {
-    var fragmentShader, fragmentShaderSource, gl, program, texCoordBuffer, textureCoordAttribute, vertexPositionAttribute, vertexShader, vertexShaderSource, verticesBuffer;
-    if (!fallbackRenderer) {
-      canvas.gl = canvas.getContext('webgl');
-    }
-    gl = canvas.gl;
-    if (!gl || fallbackRenderer) {
-      console.log(fallbackRenderer ? 'Fallback renderer forced, not using WebGL' : 'Unable to initialize WebGL, falling back to canvas rendering');
-      vlc.pixelFormat = vlc.RV32;
-      canvas.ctx = canvas.getContext('2d');
-      delete canvas.gl;
-      return;
-    }
-    vlc.pixelFormat = vlc.I420;
-    canvas.I420Program = gl.createProgram();
-    program = canvas.I420Program;
-    vertexShaderSource = ['attribute highp vec4 aVertexPosition;', 'attribute vec2 aTextureCoord;', 'varying highp vec2 vTextureCoord;', 'void main(void) {', ' gl_Position = aVertexPosition;', ' vTextureCoord = aTextureCoord;', '}'].join('\n');
-    vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, vertexShaderSource);
-    gl.compileShader(vertexShader);
-    fragmentShaderSource = ['precision highp float;', 'varying lowp vec2 vTextureCoord;', 'uniform sampler2D YTexture;', 'uniform sampler2D UTexture;', 'uniform sampler2D VTexture;', 'const mat4 YUV2RGB = mat4', '(', ' 1.1643828125, 0, 1.59602734375, -.87078515625,', ' 1.1643828125, -.39176171875, -.81296875, .52959375,', ' 1.1643828125, 2.017234375, 0, -1.081390625,', ' 0, 0, 0, 1', ');', 'void main(void) {', ' gl_FragColor = vec4( texture2D(YTexture, vTextureCoord).x, texture2D(UTexture, vTextureCoord).x, texture2D(VTexture, vTextureCoord).x, 1) * YUV2RGB;', '}'].join('\n');
-    fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, fragmentShaderSource);
-    gl.compileShader(fragmentShader);
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    gl.useProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.log('Shader link failed.');
-    }
-    vertexPositionAttribute = gl.getAttribLocation(program, 'aVertexPosition');
-    gl.enableVertexAttribArray(vertexPositionAttribute);
-    textureCoordAttribute = gl.getAttribLocation(program, 'aTextureCoord');
-    gl.enableVertexAttribArray(textureCoordAttribute);
-    verticesBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, verticesBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, -1.0, 0.0, -1.0, -1.0, 0.0]), gl.STATIC_DRAW);
-    gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
-    texCoordBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0]), gl.STATIC_DRAW);
-    gl.vertexAttribPointer(textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
-  };
-  frameSetup = function(canvas, width, height, pixelFormat, videoFrame) {
-    var gl, program;
-    gl = canvas.gl;
-    canvas.width = width;
-    canvas.height = height;
-    if (!gl) {
-      canvas.img = canvas.ctx.createImageData(width, height);
-      return;
-    }
-    program = canvas.I420Program;
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    videoFrame.y = new Texture(gl, width, height);
-    videoFrame.u = new Texture(gl, width >> 1, height >> 1);
-    videoFrame.v = new Texture(gl, width >> 1, height >> 1);
-    videoFrame.y.bind(0, program, 'YTexture');
-    videoFrame.u.bind(1, program, 'UTexture');
-    videoFrame.v.bind(2, program, 'VTexture');
-  };
+}).provider('wcjsRenderer', function() {
+  var wcAddonPath;
+  wcAddonPath = null;
   return {
-    init: function(canvas, params, fallbackRenderer) {
-      var setFrame, vlc;
-      if (params == null) {
-        params = {};
-      }
-      this._canvas = canvas;
-      vlc = wcAddon.createPlayer(params);
-      setupCanvas(canvas, vlc, fallbackRenderer);
-      vlc.onFrameSetup = function(width, height, pixelFormat, videoFrame) {
-        frameSetup(canvas, width, height, pixelFormat, videoFrame);
-        canvas.addEventListener('webglcontextlost', (function(event) {
-          event.preventDefault();
-        }), false);
-        canvas.addEventListener('webglcontextrestored', (function(w, h, p, v) {
-          return function(event) {
-            setupCanvas(canvas, vlc);
-            frameSetup(canvas, w, h, p, v);
-          };
-        })(width, height, pixelFormat, videoFrame), false);
-      };
-      setFrame = this;
-      vlc.onFrameReady = function(videoFrame) {
-        (canvas.gl ? render : renderFallback)(canvas, videoFrame, vlc);
-        setFrame._lastFrame = videoFrame;
-      };
-      return vlc;
+    setAddonPath: function(path) {
+      return wcAddonPath = path;
     },
-    clearCanvas: function() {
-      var arr1, arr2, gl, i;
-      if (this._lastFrame) {
-        gl = this._canvas.gl;
-        arr1 = new Uint8Array(this._lastFrame.uOffset);
-        arr2 = new Uint8Array(this._lastFrame.vOffset - this._lastFrame.uOffset);
+    $get: function($log, Texture) {
+      var frameSetup, render, renderFallback, setupCanvas;
+      render = function(canvas, videoFrame, vlc) {
+        var gl, len;
+        if (!vlc.playing) {
+          return;
+        }
+        gl = canvas.gl;
+        len = videoFrame.length;
+        videoFrame.y.fill(videoFrame.subarray(0, videoFrame.uOffset));
+        videoFrame.u.fill(videoFrame.subarray(videoFrame.uOffset, videoFrame.vOffset));
+        videoFrame.v.fill(videoFrame.subarray(videoFrame.vOffset, len));
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      };
+      renderFallback = function(canvas, videoFrame) {
+        var buf, height, i, j, o, width;
+        buf = canvas.img.data;
+        width = videoFrame.width;
+        height = videoFrame.height;
         i = 0;
-        while (i < arr2.length) {
-          arr2[i] = 128;
+        while (i < height) {
+          j = 0;
+          while (j < width) {
+            o = (j + width * i) * 4;
+            buf[o + 0] = videoFrame[o + 2];
+            buf[o + 1] = videoFrame[o + 1];
+            buf[o + 2] = videoFrame[o + 0];
+            buf[o + 3] = videoFrame[o + 3];
+            ++j;
+          }
           ++i;
         }
-        this._lastFrame.y.fill(arr1);
-        this._lastFrame.u.fill(arr2);
-        this._lastFrame.v.fill(arr2);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      }
-    },
-    _lastFrame: false,
-    _canvas: false
+        canvas.ctx.putImageData(canvas.img, 0, 0);
+      };
+      setupCanvas = function(canvas, vlc, fallbackRenderer) {
+        var fragmentShader, fragmentShaderSource, gl, program, texCoordBuffer, textureCoordAttribute, vertexPositionAttribute, vertexShader, vertexShaderSource, verticesBuffer;
+        if (!fallbackRenderer) {
+          canvas.gl = canvas.getContext('webgl');
+        }
+        gl = canvas.gl;
+        if (!gl || fallbackRenderer) {
+          console.log(fallbackRenderer ? 'Fallback renderer forced, not using WebGL' : 'Unable to initialize WebGL, falling back to canvas rendering');
+          vlc.pixelFormat = vlc.RV32;
+          canvas.ctx = canvas.getContext('2d');
+          delete canvas.gl;
+          return;
+        }
+        vlc.pixelFormat = vlc.I420;
+        canvas.I420Program = gl.createProgram();
+        program = canvas.I420Program;
+        vertexShaderSource = ['attribute highp vec4 aVertexPosition;', 'attribute vec2 aTextureCoord;', 'varying highp vec2 vTextureCoord;', 'void main(void) {', ' gl_Position = aVertexPosition;', ' vTextureCoord = aTextureCoord;', '}'].join('\n');
+        vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader, vertexShaderSource);
+        gl.compileShader(vertexShader);
+        fragmentShaderSource = ['precision highp float;', 'varying lowp vec2 vTextureCoord;', 'uniform sampler2D YTexture;', 'uniform sampler2D UTexture;', 'uniform sampler2D VTexture;', 'const mat4 YUV2RGB = mat4', '(', ' 1.1643828125, 0, 1.59602734375, -.87078515625,', ' 1.1643828125, -.39176171875, -.81296875, .52959375,', ' 1.1643828125, 2.017234375, 0, -1.081390625,', ' 0, 0, 0, 1', ');', 'void main(void) {', ' gl_FragColor = vec4( texture2D(YTexture, vTextureCoord).x, texture2D(UTexture, vTextureCoord).x, texture2D(VTexture, vTextureCoord).x, 1) * YUV2RGB;', '}'].join('\n');
+        fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader, fragmentShaderSource);
+        gl.compileShader(fragmentShader);
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        gl.useProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          console.log('Shader link failed.');
+        }
+        vertexPositionAttribute = gl.getAttribLocation(program, 'aVertexPosition');
+        gl.enableVertexAttribArray(vertexPositionAttribute);
+        textureCoordAttribute = gl.getAttribLocation(program, 'aTextureCoord');
+        gl.enableVertexAttribArray(textureCoordAttribute);
+        verticesBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, verticesBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, -1.0, 0.0, -1.0, -1.0, 0.0]), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+        texCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0]), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(textureCoordAttribute, 2, gl.FLOAT, false, 0, 0);
+      };
+      frameSetup = function(canvas, width, height, pixelFormat, videoFrame) {
+        var gl, program;
+        gl = canvas.gl;
+        canvas.width = width;
+        canvas.height = height;
+        if (!gl) {
+          canvas.img = canvas.ctx.createImageData(width, height);
+          return;
+        }
+        program = canvas.I420Program;
+        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+        videoFrame.y = new Texture(gl, width, height);
+        videoFrame.u = new Texture(gl, width >> 1, height >> 1);
+        videoFrame.v = new Texture(gl, width >> 1, height >> 1);
+        videoFrame.y.bind(0, program, 'YTexture');
+        videoFrame.u.bind(1, program, 'UTexture');
+        videoFrame.v.bind(2, program, 'VTexture');
+      };
+      return {
+        init: function(canvas, params, fallbackRenderer) {
+          var setFrame, vlc, wcAddon;
+          if (params == null) {
+            params = {};
+          }
+          this._canvas = canvas;
+          if (!wcAddonPath) {
+            $log.error('wcAddonPath not found, use wcjsRenderer.setAddonPath \'path\' to set');
+            return;
+          }
+          wcAddon = require(wcAddonPath + '/WebChimera.js.node');
+          vlc = wcAddon.createPlayer(params);
+          setupCanvas(canvas, vlc, fallbackRenderer);
+          vlc.onFrameSetup = function(width, height, pixelFormat, videoFrame) {
+            frameSetup(canvas, width, height, pixelFormat, videoFrame);
+            canvas.addEventListener('webglcontextlost', (function(event) {
+              event.preventDefault();
+            }), false);
+            canvas.addEventListener('webglcontextrestored', (function(w, h, p, v) {
+              return function(event) {
+                setupCanvas(canvas, vlc);
+                frameSetup(canvas, w, h, p, v);
+              };
+            })(width, height, pixelFormat, videoFrame), false);
+          };
+          setFrame = this;
+          vlc.onFrameReady = function(videoFrame) {
+            (canvas.gl ? render : renderFallback)(canvas, videoFrame, vlc);
+            setFrame._lastFrame = videoFrame;
+          };
+          return vlc;
+        },
+        clearCanvas: function() {
+          var arr1, arr2, gl, i;
+          if (this._lastFrame) {
+            gl = this._canvas.gl;
+            arr1 = new Uint8Array(this._lastFrame.uOffset);
+            arr2 = new Uint8Array(this._lastFrame.vOffset - this._lastFrame.uOffset);
+            i = 0;
+            while (i < arr2.length) {
+              arr2[i] = 128;
+              ++i;
+            }
+            this._lastFrame.y.fill(arr1);
+            this._lastFrame.u.fill(arr2);
+            this._lastFrame.v.fill(arr2);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+          }
+        },
+        _lastFrame: false,
+        _canvas: false
+      };
+    }
   };
 });
 
@@ -917,11 +917,11 @@ angular.module('wcjs-angular').service('WC_UTILS', function($window) {
 
 'use strict';
 
-angular.module('wcjs-angular.plugins', ['wcjs-angular.plugins.bottom-controls', 'wcjs-angular.plugins.top-controls', 'wcjs-angular.plugins.next-video', 'wcjs-angular.plugins.buffering', 'wcjs-angular.plugins.overlay-play', 'wcjs-angular.plugins.poster', 'wcjs-angular.plugins.video-info']);
+angular.module('wcjs-angular.plugins', []);
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.analytics', ['angulartics']).directive('wcAnalytics', function($analytics, WC_STATES) {
+angular.module('wcjs-angular.plugins').directive('wcAnalytics', function($analytics, WC_STATES) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1054,7 +1054,7 @@ angular.module('wcjs-angular.plugins.analytics', ['angulartics']).directive('wcA
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls', []).directive('wcControlsContainer', function() {
+angular.module('wcjs-angular.plugins').directive('wcControlsContainer', function() {
   return {
     restrict: 'A',
     link: function(scope, elem, attr) {
@@ -1134,7 +1134,7 @@ angular.module('wcjs-angular.plugins.bottom-controls', []).directive('wcControls
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcFullscreenButton', function() {
+angular.module('wcjs-angular.plugins').directive('wcFullscreenButton', function() {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1165,7 +1165,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcFullscreenBu
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcPlayPauseButton', function(WC_STATES) {
+angular.module('wcjs-angular.plugins').directive('wcPlayPauseButton', function(WC_STATES) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1196,7 +1196,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcPlayPauseBut
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcPlaybackButton', function(WC_UTILS) {
+angular.module('wcjs-angular.plugins').directive('wcPlaybackButton', function(WC_UTILS) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1223,7 +1223,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcPlaybackButt
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcScrubBarCuePoints', function() {
+angular.module('wcjs-angular.plugins').directive('wcScrubBarCuePoints', function() {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1273,7 +1273,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcScrubBarCueP
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcScrubBarCurrentTime', function() {
+angular.module('wcjs-angular.plugins').directive('wcScrubBarCurrentTime', function() {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1299,7 +1299,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcScrubBarCurr
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').filter('formatTime', function() {
+angular.module('wcjs-angular.plugins').filter('formatTime', function() {
   return function(input) {
     var hours, minutes, seconds;
     input = Math.floor(input / 1000);
@@ -1446,7 +1446,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').filter('formatTime', func
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcSubtitle', function() {
+angular.module('wcjs-angular.plugins').directive('wcSubtitle', function() {
   return {
     restrict: 'E',
     scope: {
@@ -1493,7 +1493,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcSubtitle', f
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcTimeDisplay', function() {
+angular.module('wcjs-angular.plugins').directive('wcTimeDisplay', function() {
   return {
     require: '^chimerangular',
     restrict: 'E',
@@ -1528,7 +1528,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcTimeDisplay'
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcMuteButton', function() {
+angular.module('wcjs-angular.plugins').directive('wcMuteButton', function() {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1614,7 +1614,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcMuteButton',
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcVolumeBar', function(WC_UTILS) {
+angular.module('wcjs-angular.plugins').directive('wcVolumeBar', function(WC_UTILS) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1675,7 +1675,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcVolumeBar', 
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.bottom-controls').directive('wcVolume', function(WC_UTILS) {
+angular.module('wcjs-angular.plugins').directive('wcVolume', function(WC_UTILS) {
   return {
     restrict: 'E',
     link: function(scope, elem, attr) {
@@ -1698,7 +1698,7 @@ angular.module('wcjs-angular.plugins.bottom-controls').directive('wcVolume', fun
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.buffering', []).directive('wcBuffering', function(WC_STATES, WC_UTILS) {
+angular.module('wcjs-angular.plugins').directive('wcBuffering', function(WC_STATES, WC_UTILS) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1761,7 +1761,7 @@ angular.module('wcjs-angular.plugins.buffering', []).directive('wcBuffering', fu
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.dash', []).directive('wcDash', function() {
+angular.module('wcjs-angular.plugins').directive('wcDash', function() {
   return {
     restrict: 'A',
     require: '^chimerangular',
@@ -1800,7 +1800,7 @@ angular.module('wcjs-angular.plugins.dash', []).directive('wcDash', function() {
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.ima-ads', []).directive('wcImaAds', function($window, WC_STATES) {
+angular.module('wcjs-angular.plugins').directive('wcImaAds', function($window, WC_STATES) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -1987,7 +1987,7 @@ angular.module('wcjs-angular.plugins.ima-ads', []).directive('wcImaAds', functio
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.next-video', []).directive('wcNextVideo', function($timeout) {
+angular.module('wcjs-angular.plugins').directive('wcNextVideo', function($timeout) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -2077,7 +2077,7 @@ angular.module('wcjs-angular.plugins.next-video', []).directive('wcNextVideo', f
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.overlay-play', []).directive('wcOverlayPlay', function(WC_STATES) {
+angular.module('wcjs-angular.plugins').directive('wcOverlayPlay', function(WC_STATES) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -2110,7 +2110,7 @@ angular.module('wcjs-angular.plugins.overlay-play', []).directive('wcOverlayPlay
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.poster', []).directive('wcPoster', function() {
+angular.module('wcjs-angular.plugins').directive('wcPoster', function() {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -2126,7 +2126,7 @@ angular.module('wcjs-angular.plugins.poster', []).directive('wcPoster', function
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.top-controls').directive('wcCloseButton', function() {
+angular.module('wcjs-angular.plugins').directive('wcCloseButton', function() {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -2141,7 +2141,7 @@ angular.module('wcjs-angular.plugins.top-controls').directive('wcCloseButton', f
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.top-controls').directive('wcTitle', function() {
+angular.module('wcjs-angular.plugins').directive('wcTitle', function() {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -2154,7 +2154,7 @@ angular.module('wcjs-angular.plugins.top-controls').directive('wcTitle', functio
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.top-controls', []).directive('wcTopControls', function($timeout, WC_STATES) {
+angular.module('wcjs-angular.plugins').directive('wcTopControls', function($timeout, WC_STATES) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -2225,7 +2225,7 @@ angular.module('wcjs-angular.plugins.top-controls', []).directive('wcTopControls
 
 'use strict';
 
-angular.module('wcjs-angular.plugins.video-info', []).directive('wcVideoInfo', function() {
+angular.module('wcjs-angular.plugins').directive('wcVideoInfo', function() {
   return {
     restrict: 'E',
     require: '^chimerangular',

@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.ima-ads', []
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcImaAds', ($window, WC_STATES) ->
   restrict: 'E'

@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.analytics', [ 'angulartics' ]
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcAnalytics', ($analytics, WC_STATES) ->
   restrict: 'E'

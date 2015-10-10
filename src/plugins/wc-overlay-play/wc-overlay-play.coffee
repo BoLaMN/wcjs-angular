@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.overlay-play', []
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcOverlayPlay', (WC_STATES) ->
   restrict: 'E'

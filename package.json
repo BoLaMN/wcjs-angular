@@ -1,8 +1,8 @@
 {
   "name": "wcjs-angular",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Angular WebChimera",
-  "main": "build/scripts/main.js",
+  "main": "scripts/main.js",
   "devDependencies": {
     "coffee-script": "~1.10.0",
     "grunt": "^0.4.5",

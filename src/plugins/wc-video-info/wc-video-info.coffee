@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.video-info', []
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcVideoInfo', ->
   restrict: 'E'

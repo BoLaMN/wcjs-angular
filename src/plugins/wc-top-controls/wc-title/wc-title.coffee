@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.top-controls'
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcTitle', ->
   restrict: 'E'

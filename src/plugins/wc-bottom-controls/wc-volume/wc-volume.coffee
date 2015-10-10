@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.bottom-controls'
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcVolume', (WC_UTILS) ->
   restrict: 'E'

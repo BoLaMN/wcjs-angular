@@ -1,6 +1,6 @@
 'use strict'
 
-angular.module 'wcjs-angular.plugins.next-video', []
+angular.module 'wcjs-angular.plugins'
 
 .directive 'wcNextVideo', ($timeout) ->
   restrict: 'E'
