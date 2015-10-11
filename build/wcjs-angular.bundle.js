@@ -2353,7 +2353,7 @@ angular.module('wcjs-angular').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('plugins/wc-top-controls/wc-close-button/wc-close-button.html',
-    "<md-button class='iconButton'\n" +
+    "<md-button class='iconButton close'\n" +
     "        ng-click='onClosePlayer()'\n" +
     "        aria-label='Close Player'\n" +
     "        type='button'>\n" +

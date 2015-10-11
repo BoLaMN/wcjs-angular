@@ -76,20 +76,12 @@ div.menu a.selected {
   opacity: 0;
 }
 
-pt-detail {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 9;
-}
 chimerangular,
 [chimerangular] {
   width: 100%;
   height: 100%;
   position: relative;
-  background-color: #000;
+  background-color: #000 !important;
   display: block;
   flex-direction: column;
   -webkit-touch-callout: none;
@@ -121,10 +113,9 @@ chimerangular wc-media canvas,
   max-width: 100%;
   max-height: 100%;
 }
-chimerangular .iconButton,
-[chimerangular] .iconButton {
-  color: #fff;
-  font-family: 'videogular';
+chimerangular .iconButton md-icon,
+[chimerangular] .iconButton md-icon {
+  color: #fff !important;
   speak: none;
   font-style: normal;
   font-weight: normal;
@@ -136,8 +127,8 @@ chimerangular .iconButton,
   padding: 6px;
   border: none;
 }
-chimerangular .iconButton:focus,
-[chimerangular] .iconButton:focus {
+chimerangular .iconButton md-icon:focus,
+[chimerangular] .iconButton md-icon:focus {
   border: 1px solid #fff;
 }
 
@@ -642,7 +633,7 @@ wc-top-controls {
   display: block;
   position: absolute;
   z-index: 3;
-  bottom: 0;
+  top: 0;
 }
 wc-top-controls .controls-container {
   width: 100%;
@@ -652,13 +643,13 @@ wc-top-controls .controls-container {
   display: table;
   zoom: 1;
 }
-wc-close-button {
-  display: table-cell;
-  width: 50px;
-  height: 50px;
+wc-close-button .md-button {
+  display: table-cell !important;
+  min-width: 40px !important;
+  height: 40px;
   vertical-align: middle;
-  text-align: center;
-  cursor: pointer;
+  text-align: center !important;
+  cursor: pointer !important;
   float: left;
 }
 wc-top-controls .hide-animation {

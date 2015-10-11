@@ -1,6 +1,6 @@
 {
   "name": "wcjs-angular",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Angular WebChimera",
   "main": "scripts/main.js",
   "devDependencies": {
