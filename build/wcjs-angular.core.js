@@ -1,5 +1,5 @@
 'use strict';
-angular.module('wcjs-angular', ['wcjs-angular.plugins']);
+angular.module('wcjs-angular', ['wcjs-angular.plugins', 'cfp.hotkeys']);
 
 'use strict';
 
@@ -280,8 +280,11 @@ angular.module('wcjs-angular').controller('wcController', function($scope, $wind
     wcFullscreen.request(element);
   };
   this.changeSource = function(newValue) {
+    index(this.wcjsElement.playlist.currentItem);
+    console.log(this.sources[index]);
+    this.source = this.sources[index];
     $scope.wcChangeSource({
-      $source: newValue
+      $source: this.sources[index]
     });
   };
   this.setVolume = function(newVolume) {
@@ -338,6 +341,7 @@ angular.module('wcjs-angular').controller('wcController', function($scope, $wind
     };
   };
   this.addListeners = function() {
+    this.wcjsElement.onMediaChanged = this.changeSource.bind(this);
     this.wcjsElement.onBuffering = this.onStartBuffering.bind(this);
     this.wcjsElement.onPlaying = this.onPlay.bind(this);
     this.wcjsElement.onPaused = this.onPause.bind(this);
@@ -460,7 +464,7 @@ angular.module('wcjs-angular').directive('wcLoop', function() {
 
 'use strict';
 
-angular.module('wcjs-angular').directive('wcMedia', function($timeout, $sce, WC_UTILS, WC_STATES, wcjsRenderer) {
+angular.module('wcjs-angular').directive('wcMedia', function($timeout, $sce, WC_STATES, wcjsRenderer) {
   return {
     restrict: 'E',
     require: '^chimerangular',
@@ -469,52 +473,32 @@ angular.module('wcjs-angular').directive('wcMedia', function($timeout, $sce, WC_
       wcSrc: '=?'
     },
     link: function(scope, elem, attrs, chimera) {
-      var sources;
-      sources = void 0;
+      var onChangeSource;
       chimera.wcjsElement = wcjsRenderer.init(elem.find('canvas')[0]);
       chimera.sources = scope.wcSrc;
       chimera.addListeners();
-      scope.onChangeSource = function(newValue, oldValue) {
-        if ((!sources || newValue !== oldValue) && newValue) {
-          sources = newValue;
+      onChangeSource = function(sources, oldSources) {
+        if (sources && sources !== oldSource) {
           if (chimera.currentState !== WC_STATES.PLAY) {
             chimera.currentState = WC_STATES.STOP;
           }
           chimera.sources = sources;
-          return scope.changeSource();
+          while (i < sources.length) {
+            chimera.wcjsElement.playlist.add($sce.trustAsResourceUrl(sources[i].url));
+            i++;
+          }
+          $timeout(function() {
+            if (chimera.autoPlay) {
+              chimera.play();
+            }
+            chimera.onVideoReady();
+          });
         }
       };
-      scope.changeSource = function() {
-        var i, l;
-        i = 0;
-        l = sources.length;
-        while (i < l) {
-          if (sources[i].selected) {
-            chimera.wcjsElement.playlist.add($sce.trustAsResourceUrl(sources[i].src));
-            break;
-          }
-          i++;
-        }
-        return $timeout(function() {
-          if (chimera.autoPlay) {
-            chimera.play();
-          }
-          chimera.onVideoReady();
-        });
-      };
-      scope.$watch('wcSrc', scope.onChangeSource);
-      scope.$watch(function() {
+      scope.$watch('wcSrc', onChangeSource);
+      return scope.$watch(function() {
         return chimera.sources;
-      }, scope.onChangeSource);
-      if (chimera.isConfig) {
-        return scope.$watch(function() {
-          return chimera.config;
-        }, function() {
-          if (chimera.config) {
-            return scope.wcSrc = chimera.config.sources;
-          }
-        });
-      }
+      }, onChangeSource);
     }
   };
 });
@@ -547,72 +531,6 @@ angular.module('wcjs-angular').directive('wcPreload', function() {
               return scope.setPreload(preload);
             } else {
               return scope.setPreload();
-            }
-          });
-        }
-      }
-    }
-  };
-});
-
-'use strict';
-
-angular.module('wcjs-angular').directive('wcTracks', function() {
-  return {
-    restrict: 'A',
-    require: '^chimerangular',
-    link: {
-      pre: function(scope, elem, attr, chimera) {
-        var i, l, trackText, tracks;
-        tracks = void 0;
-        trackText = void 0;
-        i = void 0;
-        l = void 0;
-        scope.changeSource = function() {
-          var oldTracks, prop, results;
-          oldTracks = chimera.wcjsElement.children();
-          i = 0;
-          l = oldTracks.length;
-          while (i < l) {
-            if (oldTracks[i].remove) {
-              oldTracks[i].remove();
-            }
-            i++;
-          }
-          if (tracks) {
-            i = 0;
-            l = tracks.length;
-            results = [];
-            while (i < l) {
-              trackText = '';
-              trackText += '<track ';
-              for (prop in tracks[i]) {
-                trackText += prop + '="' + tracks[i][prop] + '" ';
-              }
-              trackText += '></track>';
-              chimera.wcjsElement.append(trackText);
-              results.push(i++);
-            }
-            return results;
-          }
-        };
-        scope.setTracks = function(value) {
-          tracks = value;
-          chimera.tracks = value;
-          return scope.changeSource();
-        };
-        if (chimera.isConfig) {
-          return scope.$watch(function() {
-            return chimera.config;
-          }, function() {
-            if (chimera.config) {
-              return scope.setTracks(chimera.config.tracks);
-            }
-          });
-        } else {
-          return scope.$watch(attr.wcTracks, function(newValue, oldValue) {
-            if (!tracks || newValue !== oldValue) {
-              return scope.setTracks(newValue);
             }
           });
         }
@@ -913,6 +831,382 @@ angular.module('wcjs-angular').service('WC_UTILS', function($window) {
       return false;
     }
   };
+}).constant('HotKeyBinds', {
+  section_order: ["General", "Navigation", "Browsing & Playback Adjustments", "Manage"],
+  sections: {
+    General: [
+      {
+        combo: "f",
+        description: "Fullscreen",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "space",
+        description: "Play/Pause",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "v",
+        description: "Subtitles cycle/off",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "b",
+        description: "Audio track cycle",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+up",
+        description: "Volume Up",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+down",
+        description: "Volume down",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+o",
+        description: "Open Single file(s)",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }
+    ],
+    Navigation: [
+      {
+        combo: "ctrl+t",
+        description: "Goto/jump to time",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "shift+left",
+        description: "Very short jump – back 3 secs",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "shift+right",
+        description: "Very short jump – forward 3 secs",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+left",
+        description: "Short jump – back 10 secs",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+right",
+        description: "Short jump – forward 10 secs",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+left",
+        description: "Medium jump – back 1 min",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+right",
+        description: "Medium jump – forward 1 min",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+alt+left",
+        description: "Long jump back",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+alt+right",
+        description: "Long jump forward",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "e",
+        description: "Next frame",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "n",
+        description: "Next in playlist",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "p",
+        description: "Current from beginning/Previous in playlist",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }
+    ],
+    "Browsing & Playback Adjustments": [
+      {
+        combo: "ctrl+d",
+        description: "Open disc menu",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+p",
+        description: "Open folder (browse folder menu)",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+r",
+        description: "Advanced open file",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+o",
+        description: "Open single file(s)",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "m",
+        description: "Mute and unmute audio",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "s",
+        description: "Stop movie",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "esc",
+        description: "Exit full screen mode",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "+",
+        description: "Faster",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "-",
+        description: "Slower",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "=",
+        description: "Normal",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "a",
+        description: "Aspect ratio",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "c",
+        description: "Crop screen",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "g",
+        description: "Increase subtitle delay",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "h",
+        description: "Decrease subtitle delay",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "j",
+        description: "Increase audio delay",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "k",
+        description: "Decrease audio delay",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "z",
+        description: "Change zoom mode",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "t",
+        description: "Show time",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "r",
+        description: "Random",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }
+    ],
+    Manage: [
+      {
+        combo: "ctrl+h",
+        description: "Hide / unhide controls",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+p",
+        description: "Preferences / interface settings",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+e",
+        description: "Adjustments and audio/video effects",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+b",
+        description: "Edit bookmarks",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+m",
+        description: "Open messages",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+n",
+        description: "Open network",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+c",
+        description: "Open capture device",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+l",
+        description: "Open playlist",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+y",
+        description: "Save playlist",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+i",
+        description: "Media information",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+a",
+        description: "Open audio menu",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+h",
+        description: "Open help menu",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+m",
+        description: "Open media menu",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+p",
+        description: "Open playlist menu",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+t",
+        description: "Open tool menu",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+v",
+        description: "Open video menu",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+l",
+        description: "Open playback menu",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "d",
+        description: "Show movie path",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "f1",
+        description: "Show Help",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "f11",
+        description: "Window fullscreen",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "alt+f4",
+        description: "Quit VLC",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }, {
+        combo: "ctrl+q",
+        description: "Quit VLC (alternative)",
+        callback: function(event, hotkey) {
+          event.preventDefault();
+        }
+      }
+    ]
+  }
 });
 
 'use strict';
@@ -1477,7 +1771,7 @@ angular.module('wcjs-angular.plugins').directive('wcSubtitle', function() {
     require: '^chimerangular',
     template: '<ul>\n  <li ng-repeat="subtitle in subtitles" ng-class="{ \'active\': currentSubtitle.name === subtitle.name }" ng-click="changeSubtitle(subtitle)">\n    {{ subtitle.name }}\n  </li>\n</ul>',
     link: function(scope, elem, attr, chimera) {
-      var onChangeVisibility;
+      var onChangeSource, onChangeVisibility;
       scope.changeSubtitle = function(subtitle) {
         scope.currentSubtitle = subtitle;
         scope.subtitleVisibility = 'hidden';
@@ -1487,6 +1781,15 @@ angular.module('wcjs-angular.plugins').directive('wcSubtitle', function() {
         elem.css('visibility', value);
       };
       scope.$watch('subtitleVisibility', onChangeVisibility);
+      onChangeSource = function(newSource, oldSource) {
+        if (newSource && newSource !== oldSource) {
+          scope.subtitles = newSource.subtitles;
+          return console.log(newSource, 'new source');
+        }
+      };
+      scope.$watch(function() {
+        return chimera.source;
+      }, onChangeSource);
     }
   };
 });

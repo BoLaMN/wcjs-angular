@@ -2,4 +2,5 @@
 
 angular.module 'wcjs-angular', [
   'wcjs-angular.plugins'
+  'cfp.hotkeys'
 ]

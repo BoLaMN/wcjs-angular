@@ -30,12 +30,34 @@ module.exports = (grunt) ->
         files: 'build/wcjs-angular.bundle.js': [ 'build/wcjs-angular.bundle.js' ]
   
     concat:
+      vendor_js:
+        src: [
+          'src/vendor/js/**/*.js'
+          'src/vendor/js/**'
+        ]
+        dest: 'build/wcjs-angular.vendor.js'
+      
       js:
         src: [
           'build/wcjs-angular.core.js'
+          'build/wcjs-angular.vendor.js'
           'build/wcjs-angular.templates.js'
         ]
         dest: 'build/wcjs-angular.bundle.js'
+
+      vendor_css:
+        src: [
+          'src/vendor/css/**/*.css'
+          'src/vendor/css/**'
+        ]
+        dest: 'build/wcjs-angular.vendor.css'
+
+      css:
+        src: [
+          'build/wcjs-angular.core.css'
+          'build/wcjs-angular.vendor.css'
+        ]
+        dest: 'build/wcjs-angular.bundle.css'
 
     stylus:
       build:
@@ -47,7 +69,7 @@ module.exports = (grunt) ->
         
         expand: true
         join: true
-        files: 'build/wcjs-angular.css': ['src/**/*.styl', 'src/**/**.styl']
+        files: 'build/wcjs-angular.core.css': ['src/**/*.styl', 'src/**/**.styl']
 
-  grunt.registerTask 'default', [ 'clean', 'coffee', 'ngtemplates', 'concat', 'ngAnnotate', 'stylus' ]
+  grunt.registerTask 'default', [ 'clean', 'coffee', 'ngtemplates', 'stylus', 'concat', 'ngAnnotate' ]
  

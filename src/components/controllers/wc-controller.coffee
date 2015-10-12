@@ -221,7 +221,10 @@ angular.module 'wcjs-angular'
     return
 
   @changeSource = (newValue) ->
-    $scope.wcChangeSource $source: newValue
+    index @wcjsElement.playlist.currentItem
+    console.log @sources[index]
+    @source = @sources[index]
+    $scope.wcChangeSource $source: @sources[index]
     return
 
   @setVolume = (newVolume) ->
@@ -291,7 +294,7 @@ angular.module 'wcjs-angular'
     #@wcjsElement.onFrameReady =  
     #@wcjsElement.onFrameCleanup =  
 
-    #@wcjsElement.onMediaChanged =  
+    @wcjsElement.onMediaChanged =  @changeSource.bind(this)
     #@wcjsElement.onNothingSpecial = @onCanPlay.bind(this) 
     
     #for event in ['MediaChanged', 'NothingSpecial', 'Stopped', 'Forward', 'Backward', 'PositiChanged', 'SeekableChanged', 'PausableChanged']

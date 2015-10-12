@@ -52,4 +52,13 @@ angular.module 'wcjs-angular.plugins'
 
     scope.$watch 'subtitleVisibility', onChangeVisibility
 
+    onChangeSource = (newSource, oldSource) ->
+      if newSource and newSource != oldSource
+        scope.subtitles = newSource.subtitles 
+        console.log newSource, 'new source'
+
+    scope.$watch ->
+      chimera.source
+    , onChangeSource
+
     return

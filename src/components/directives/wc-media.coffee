@@ -2,59 +2,41 @@
 
 angular.module 'wcjs-angular'
 
-.directive 'wcMedia', ($timeout, $sce, WC_UTILS, WC_STATES, wcjsRenderer) ->
+.directive 'wcMedia', ($timeout, $sce, WC_STATES, wcjsRenderer) ->
   restrict: 'E'
   require: '^chimerangular'
   template: '<canvas></canvas>'
   scope:
     wcSrc: '=?'
   link: (scope, elem, attrs, chimera) ->
-    sources = undefined
-
-    # INIT
     chimera.wcjsElement = wcjsRenderer.init elem.find('canvas')[0]
     chimera.sources = scope.wcSrc
 
     chimera.addListeners()
     
-    # FUNCTIONS
-    scope.onChangeSource = (newValue, oldValue) ->
-      if (!sources or newValue != oldValue) and newValue
-        sources = newValue
+    onChangeSource = (sources, oldSources) ->
+      if sources and sources != oldSource
         
         if chimera.currentState != WC_STATES.PLAY
           chimera.currentState = WC_STATES.STOP
         
         chimera.sources = sources
-        scope.changeSource()
 
-    scope.changeSource = ->
-      i = 0
-      l = sources.length
-      
-      while i < l
-        if sources[i].selected
-          chimera.wcjsElement.playlist.add $sce.trustAsResourceUrl(sources[i].src)
-          break
-        i++
+        while i < sources.length
+          chimera.wcjsElement.playlist.add $sce.trustAsResourceUrl sources[i].url
+          i++
 
-      $timeout ->
-        if chimera.autoPlay
-          chimera.play()
+        $timeout ->
+          if chimera.autoPlay
+            chimera.play()
 
-        chimera.onVideoReady()
-        return
+          chimera.onVideoReady()
+          return
 
-    scope.$watch 'wcSrc', scope.onChangeSource
+      return
+
+    scope.$watch 'wcSrc', onChangeSource
     
     scope.$watch ->
       chimera.sources
-    , scope.onChangeSource
-
-    if chimera.isConfig
-      scope.$watch ->
-        chimera.config
-      , ->
-        if chimera.config
-          scope.wcSrc = chimera.config.sources
-
+    , onChangeSource
