@@ -114,7 +114,9 @@ chimerangular wc-media canvas,
   max-height: 100%;
 }
 chimerangular .iconButton md-icon,
-[chimerangular] .iconButton md-icon {
+[chimerangular] .iconButton md-icon,
+chimerangular .iconButton,
+[chimerangular] .iconButton {
   color: #fff !important;
   speak: none;
   font-style: normal;
@@ -528,8 +530,8 @@ wc-ima-ads {
 }
 
 wc-next-video {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   margin: 0;
   padding: 0;
   top: 0;
@@ -638,7 +640,6 @@ wc-top-controls {
 wc-top-controls .controls-container {
   width: 100%;
   height: 50px;
-  background-color: rgba(0,0,0,0.5);
   position: absolute;
   display: table;
   zoom: 1;

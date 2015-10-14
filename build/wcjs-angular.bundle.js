@@ -63,7 +63,7 @@ angular.module('wcjs-angular').constant('WC_STATES', {
   autoHide: true,
   autoHideTime: 3000,
   preload: 'auto',
-  sources: null,
+  sources: [],
   tracks: [],
   poster: null
 }).factory('playerConfig', ["defaultPlayerConfig", function(defaultPlayerConfig) {
@@ -420,7 +420,8 @@ angular.module('wcjs-angular').directive('chimerangular', function() {
     controllerAs: 'chimera',
     link: {
       pre: function(scope, elem, attr, controller) {
-        return controller.chimerangularElement = angular.element(elem);
+        controller.chimerangularElement = angular.element(elem);
+        return controller.onLoadConfig(scope.wcConfig);
       }
     }
   };
@@ -469,35 +470,35 @@ angular.module('wcjs-angular').directive('wcMedia', ["$timeout", "$sce", "WC_STA
     restrict: 'E',
     require: '^chimerangular',
     template: '<canvas></canvas>',
-    scope: {
-      wcSrc: '=?'
-    },
     link: function(scope, elem, attrs, chimera) {
       var onChangeSource;
       chimera.wcjsElement = wcjsRenderer.init(elem.find('canvas')[0]);
-      chimera.sources = scope.wcSrc;
       chimera.addListeners();
       onChangeSource = function(sources, oldSources) {
-        if (sources && sources !== oldSource) {
+        var i;
+        console.log(sources);
+        if (sources.length) {
           if (chimera.currentState !== WC_STATES.PLAY) {
             chimera.currentState = WC_STATES.STOP;
           }
           chimera.sources = sources;
+          i = 0;
           while (i < sources.length) {
-            chimera.wcjsElement.playlist.add($sce.trustAsResourceUrl(sources[i].url));
+            console.log(sources[i].file);
+            chimera.wcjsElement.playlist.add($sce.trustAsResourceUrl(sources[i].file));
             i++;
           }
           $timeout(function() {
             if (chimera.autoPlay) {
-              chimera.play();
+              return chimera.play();
             }
-            chimera.onVideoReady();
           });
+          chimera.onVideoReady();
+          return;
         }
       };
-      scope.$watch('wcSrc', onChangeSource);
-      return scope.$watch(function() {
-        return chimera.sources;
+      return scope.$watchCollection(function() {
+        return chimera.config.sources;
       }, onChangeSource);
     }
   };
@@ -1490,26 +1491,53 @@ angular.module('wcjs-angular.plugins').directive('wcPlayPauseButton', ["WC_STATE
 
 'use strict';
 
-angular.module('wcjs-angular.plugins').directive('wcPlaybackButton', ["WC_UTILS", function(WC_UTILS) {
+angular.module('wcjs-angular.plugins').directive('wcPlaybackButton', ["WC_UTILS", "hotkeys", function(WC_UTILS, hotkeys) {
   return {
     restrict: 'E',
     require: '^chimerangular',
     templateUrl: 'plugins/wc-bottom-controls/wc-playback-button/wc-playback-button.html',
     link: function(scope, elem, attr, chimera) {
+      var playbackOptions;
       scope.playback = '1.0';
-      scope.onClickPlayback = function() {
-        var nextPlaybackRate, playbackOptions;
-        playbackOptions = ['.5', '1.0', '1.5', '2.0'];
-        nextPlaybackRate = playbackOptions.indexOf(scope.playback) + 1;
-        if (nextPlaybackRate >= playbackOptions.length) {
-          scope.playback = playbackOptions[0];
+      playbackOptions = ['.5', '1.0', '1.5', '2.0'];
+      scope.onClickPlayback = function(playrate) {
+        var nextPlaybackRate;
+        if (playrate) {
+          nextPlaybackRate = playbackOptions.indexOf(scope.playback) + playrate;
+          if (nextPlaybackRate >= playbackOptions.length) {
+            scope.playback = playbackOptions[0];
+          } else {
+            scope.playback = playbackOptions[nextPlaybackRate];
+          }
         } else {
-          scope.playback = playbackOptions[nextPlaybackRate];
+          scope.playback = '1.0';
         }
         return chimera.setPlayback(scope.playback);
       };
-      return scope.$watch(function() {
+      scope.$watch(function() {
         return chimera.playback;
+      });
+      hotkeys.bindTo(scope).add({
+        combo: "-",
+        description: "Slower",
+        callback: function(event) {
+          event.preventDefault();
+          scope.onClickPlayback(-1);
+        }
+      }).add({
+        combo: "=",
+        description: "Normal",
+        callback: function(event) {
+          event.preventDefault();
+          scope.onClickPlayback(0);
+        }
+      }).add({
+        combo: "+",
+        description: "Faster",
+        callback: function(event) {
+          event.preventDefault();
+          scope.onClickPlayback(1);
+        }
       });
     }
   };
@@ -4218,7 +4246,7 @@ angular.module('wcjs-angular').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('plugins/wc-bottom-controls/wc-playback-button/wc-playback-button.html',
-    "<md-button class=\"playbackValue iconButton\" ng-click=\"onClickPlayback()\">{{ playback }}x</md-button>"
+    "<md-button class=\"playbackValue iconButton\" ng-click=\"onClickPlayback(1)\">{{ playback }}x</md-button>"
   );
 
 

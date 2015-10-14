@@ -60,7 +60,7 @@ angular.module 'wcjs-angular'
   autoHide: true
   autoHideTime: 3000
   preload: 'auto'
-  sources: null
+  sources: []
   tracks: []
   poster: null
 

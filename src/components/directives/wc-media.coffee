@@ -6,37 +6,34 @@ angular.module 'wcjs-angular'
   restrict: 'E'
   require: '^chimerangular'
   template: '<canvas></canvas>'
-  scope:
-    wcSrc: '=?'
   link: (scope, elem, attrs, chimera) ->
     chimera.wcjsElement = wcjsRenderer.init elem.find('canvas')[0]
-    chimera.sources = scope.wcSrc
-
     chimera.addListeners()
     
     onChangeSource = (sources, oldSources) ->
-      if sources and sources != oldSource
-        
+      console.log sources
+      if sources.length
         if chimera.currentState != WC_STATES.PLAY
           chimera.currentState = WC_STATES.STOP
         
         chimera.sources = sources
+        
+        i = 0
 
         while i < sources.length
-          chimera.wcjsElement.playlist.add $sce.trustAsResourceUrl sources[i].url
+          console.log sources[i].file
+          chimera.wcjsElement.playlist.add $sce.trustAsResourceUrl sources[i].file
           i++
 
         $timeout ->
           if chimera.autoPlay
             chimera.play()
 
-          chimera.onVideoReady()
-          return
+        chimera.onVideoReady()
+        return
 
       return
 
-    scope.$watch 'wcSrc', onChangeSource
-    
-    scope.$watch ->
-      chimera.sources
+    scope.$watchCollection ->
+      chimera.config.sources
     , onChangeSource

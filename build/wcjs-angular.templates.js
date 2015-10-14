@@ -24,7 +24,7 @@ angular.module('wcjs-angular').run(['$templateCache', function($templateCache) {
 
 
   $templateCache.put('plugins/wc-bottom-controls/wc-playback-button/wc-playback-button.html',
-    "<md-button class=\"playbackValue iconButton\" ng-click=\"onClickPlayback()\">{{ playback }}x</md-button>"
+    "<md-button class=\"playbackValue iconButton\" ng-click=\"onClickPlayback(1)\">{{ playback }}x</md-button>"
   );
 
 

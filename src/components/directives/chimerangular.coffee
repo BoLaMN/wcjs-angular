@@ -24,3 +24,5 @@ angular.module 'wcjs-angular'
   link: 
     pre: (scope, elem, attr, controller) ->
       controller.chimerangularElement = angular.element elem
+      
+      controller.onLoadConfig scope.wcConfig 
